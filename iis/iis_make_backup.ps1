@@ -1,0 +1,26 @@
+# SCRIPT: Backup-Wwwroot.ps1
+# PURPOSE: Creates a timestamped, compressed (.zip) backup of the IIS root folder.
+
+# --- CONFIGURATION ---
+# The source folder to back up.
+$sourceDirectory = "C:\inetpub\wwwroot"
+
+# The destination folder for your backups.
+$backupDestination = "C:\BlueTeam\Backups"
+
+# --- SCRIPT BODY ---
+# Create the backup destination directory if it doesn't exist.
+if (-not (Test-Path $backupDestination)) {
+    New-Item -ItemType Directory -Path $backupDestination | Out-Null
+}
+
+# Create a timestamp for a unique backup file name.
+$timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$zipFileName = "wwwroot-backup-$timestamp.zip"
+$fullBackupPath = Join-Path -Path $backupDestination -ChildPath $zipFileName
+
+# Create the compressed backup.
+Write-Host "Backing up '$sourceDirectory' to '$fullBackupPath'..."
+Compress-Archive -Path "$sourceDirectory\*" -DestinationPath $fullBackupPath
+
+Write-Host "Backup completed successfully!"
