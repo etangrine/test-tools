@@ -2,49 +2,44 @@ param(
     [string[]]$extraExcludedUsers = @()
 )
 
-# List of allowed local users from the packet [cite: 164-175]
-$allowedLocalUsers = @(
-    "drwho",
-    "martymcFly",
-    "arthurdent",
-    "sambeckett",
-    "loki",
-    "riphunter",
-    "theflash",
-    "tonystark",
-    "drstrange",
-    "bartallen",
+# List of allowed domain users from the packet [cite: 151-162]
+$allowedDomainUsers = @(
+    "fathertime",
+    "chronos",
+    "aion",
+    "kairos",
+    "merlin",
+    "terminator",
+    "mrpeabody",
+    "jamescole",
+    "docbrown",
+    "professorparadox",
     # System accounts that should not be disabled
     "Administrator",
     "Guest",
-    "DefaultAccount",
-    "WDAGUtilityAccount",
-    # Datadog users mentioned in rules [cite: 87]
-    "datadog",
-    "dd-dog",
-    "dd-agent",
-    "whiteteam"
+    "krbtgt",
+    "DefaultAccount"
 )
 
-$allowedLocalUsers += $extraExcludedUsers
+$allowedDomainUsers += $extraExcludedUsers
 
-$groupName = "IRSeC_Allowed_Local_Users"
+$groupName = "IRSeC_Allowed_Users"
 
 # Create the group if it doesn't exist
 try {
-    Get-LocalGroup $groupName -ErrorAction Stop | Out-Null
+    Get-ADGroup $groupName -ErrorAction Stop | Out-Null
     Write-Host "Group $groupName already exists."
 }
 catch {
-    New-LocalGroup -Name $groupName
+    New-ADGroup -Name $groupName -GroupScope Global -PassThru
     Write-Host "Created group $groupName."
 }
 
 # Add allowed users to the group
 Write-Host "Adding users to $groupName..."
-foreach ($user in $allowedLocalUsers) {
+foreach ($user in $allowedDomainUsers) {
     try {
-        Add-LocalGroupMember -Group $groupName -Member $user -ErrorAction Stop
+        Add-ADGroupMember -Identity $groupName -Members (Get-ADUser -Identity $user) -ErrorAction Stop
         Write-Host " - Added $user"
     }
     catch {
@@ -53,12 +48,12 @@ foreach ($user in $allowedLocalUsers) {
 }
 
 # Disable all other users
-Write-Host "Disabling all non-allowed local users..."
-Get-LocalUser | ForEach-Object {
-    $userName = $_.Name
+Write-Host "Disabling all non-allowed domain users..."
+Get-ADUser -Filter * | ForEach-Object {
+    $userName = $_.SamAccountName
     $normalizedUserName = $userName -replace '[^a-zA-Z0-9]', ''
     if (
-        $userName -notin $allowedLocalUsers -and
+        $userName -notin $allowedDomainUsers -and
         $normalizedUserName -notmatch '(?i)datadog' -and
         $normalizedUserName -notmatch '(?i)dddog' -and
         $normalizedUserName -notmatch '(?i)whiteteam'
@@ -67,15 +62,16 @@ Get-LocalUser | ForEach-Object {
         $confirmation = Read-Host "Are you sure you want to disable $userName? (y/n)"
         if ($confirmation -eq 'y') {
             try {
-                Disable-LocalUser -Name $userName
+                Disable-ADAccount -Identity $userName
                 Write-Host " - Disabled user: $userName"
             }
             catch {
-                Write-Warning " - Could not disable $userName."
+                Write-Warning " - Could not disable $userName. It may be a protected system account."
             }
         } else {
             Write-Host " - Skipped disabling user: $userName"
         }
     }
 }
+
 Write-Host "User management complete."

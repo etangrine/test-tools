@@ -3,10 +3,10 @@
 
 # --- CONFIGURATION ---
 # The source folder to back up.
-$sourceDirectory = "C:\inetpub\wwwroot"
-
-# The destination folder for your backups.
-$backupDestination = "C:\BlueTeam\Backups"
+param(
+    [string]$sourceDirectory = "C:\inetpub\wwwroot",
+    [string]$backupDestination = "C:\BlueTeam\Backups"
+)
 
 # --- SCRIPT BODY ---
 # Create the backup destination directory if it doesn't exist.
@@ -16,7 +16,7 @@ if (-not (Test-Path $backupDestination)) {
 
 # Create a timestamp for a unique backup file name.
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$zipFileName = "wwwroot-backup-$timestamp.zip"
+$zipFileName = "$(Split-Path $sourceDirectory -Leaf)-backup-$timestamp.zip"
 $fullBackupPath = Join-Path -Path $backupDestination -ChildPath $zipFileName
 
 # Create the compressed backup.

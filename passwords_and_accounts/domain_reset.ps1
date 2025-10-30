@@ -16,22 +16,36 @@ $domainUsers = @(
     "Administrator" # Always include the default admin
 )
 
+# Ensure the output directory exists
+$outDirectory = "$env:USERPROFILE\Desktop"
+if (-not (Test-Path -Path $outDirectory)) {
+    New-Item -ItemType Directory -Path $outDirectory -Force | Out-Null
+}
+
 # Output file
-$outFile = "C:\Users\Administrator\Desktop\Domain_Passwords.txt"
+$outFile = "$outDirectory\Domain_Passwords.txt"
 $passwords = @()
+
+# Get all domain users and log the unallowed ones
+$allDomainUsers = Get-ADUser -Filter *
+$unallowedUsers = $allDomainUsers | Where-Object { $_.SamAccountName -notin $domainUsers } | Select-Object -ExpandProperty SamAccountName
+$unallowedLogFile = "$outDirectory\Unallowed_Domain_Users.txt"
+$unallowedUsers | Out-File -FilePath $unallowedLogFile
+Write-Host "List of non-allowed domain users saved to $unallowedLogFile"
 
 # Load assembly for password generation
 Add-Type -AssemblyName System.Web
 
 Write-Host "Changing domain user passwords..."
 
+# Generate a single strong password
+$newPassword = [System.Web.Security.Membership]::GeneratePassword(12, 3)
+$passwords += "Password for all domain users: $newPassword"
+
 foreach ($user in $domainUsers) {
     try {
         # Check if user exists
         $adUser = Get-ADUser -Identity $user -ErrorAction Stop
-        
-        # Generate a strong password
-        $newPassword = [System.Web.Security.Membership]::GeneratePassword(16, 3)
         
         # Set the password
         $adUser | Set-ADAccountPassword -NewPassword (ConvertTo-SecureString $newPassword -AsPlainText -Force) -Reset
@@ -39,7 +53,7 @@ foreach ($user in $domainUsers) {
         # Un-expire the password
         $adUser | Set-ADUser -PasswordNeverExpires $true
         
-        $passwords += "User: $user, Password: $newPassword"
+        #$passwords += "Successfully reset password for $user"
         Write-Host "Successfully reset password for $user"
     }
     catch {
@@ -48,5 +62,6 @@ foreach ($user in $domainUsers) {
 }
 
 # Save passwords to file
-$passwords | Out-File -FilePath $outFile
-Write-Host "Password reset complete. Credentials saved to $outFile"
+# $passwords | Out-File -FilePath $outFile
+$passwords
+# Write-Host "Password reset complete. Credentials saved to $outFile"

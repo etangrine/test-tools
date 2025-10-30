@@ -2,9 +2,21 @@
 # PURPOSE: Restores the IIS root folder from a specified backup zip file.
 
 # --- CONFIGURATION ---
+# The directory where backups are stored.
+$backupDir = "C:\BlueTeam\Backups"
+
+# Find the latest backup file automatically.
+$latestBackup = Get-ChildItem -Path $backupDir -Filter "wwwroot-backup-*.zip" |
+                Sort-Object Name -Descending |
+                Select-Object -First 1
+
+if (-not $latestBackup) {
+    Write-Error "No backup files found in '$backupDir'. Cannot proceed with restore."
+    return
+}
+
 # The full path to the .zip backup file you want to restore.
-# !!! IMPORTANT: You MUST update this path to your actual backup file. !!!
-$backupFile = "C:\BlueTeam\Backups\wwwroot-backup-YYYYMMDD-HHMMSS.zip"
+$backupFile = $latestBackup.FullName
 
 # The target directory for the restore.
 $restoreDirectory = "C:\inetpub\wwwroot"
