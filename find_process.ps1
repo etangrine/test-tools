@@ -1,5 +1,5 @@
 param (
-    [string[]]$Keywords = @("mimikatz", "nc.exe", "ncat", "reverse", "shell", "malware", "psexec")
+    [string[]]$Keywords = @("redteam","red team","mimikatz", "nc.exe", "ncat", "reverse", "shell", "malware", "psexec")
 )
 
 Write-Host "Searching for processes matching keywords: $($Keywords -join ', ')..."

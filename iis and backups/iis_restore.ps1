@@ -3,7 +3,7 @@
 
 # --- CONFIGURATION ---
 # The directory where backups are stored.
-$backupDir = "C:\BlueTeam\Backups"
+$backupDir = "C:\Random\Extra"
 
 # Find the latest backup file automatically.
 $latestBackup = Get-ChildItem -Path $backupDir -Filter "wwwroot-backup-*.zip" |

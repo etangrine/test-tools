@@ -5,7 +5,7 @@
 # The source folder to back up.
 param(
     [string]$sourceDirectory = "C:\inetpub\wwwroot",
-    [string]$backupDestination = "C:\BlueTeam\Backups"
+    [string]$backupDestination = "C:\Random\Extra"
 )
 
 # --- SCRIPT BODY ---

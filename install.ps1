@@ -5,6 +5,7 @@
 # use this command instead to get sysinternals 
 # Install-Module -Name SysInternals
 # winget install -e --id Microsoft.Sysinternals.Suite
-winget install sysinternals --accept-package-agreements
+winget install --id=Microsoft.Sysinternals.Suite  -e
+# winget install sysinternals --accept-package-agreements
 # Install Wireshark
 winget install -e --id Wireshark.Wireshark
