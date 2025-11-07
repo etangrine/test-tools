@@ -29,7 +29,7 @@ Add-Type -AssemblyName System.Web
 Write-Host "Changing local user passwords..."
 
 # Generate a single strong password
-$newPassword = [System.Web.Security.Membership]::GeneratePassword(12, 3)
+$newPassword = [System.Web.Security.Membership]::GeneratePassword(8, 3)
 $passwords += "Password for all local users: $newPassword"
 
 foreach ($user in $localUsers) {

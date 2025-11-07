@@ -61,7 +61,9 @@ Get-LocalUser | ForEach-Object {
         $userName -notin $allowedLocalUsers -and
         $normalizedUserName -notmatch '(?i)datadog' -and
         $normalizedUserName -notmatch '(?i)dddog' -and
-        $normalizedUserName -notmatch '(?i)whiteteam'
+        $normalizedUserName -notmatch '(?i)whiteteam' -and
+        $normalizedUserName -notmatch '(?i)blackteam' -and
+        $normalizedUserName -notmatch '(?i)grayteam'
     ) {
         Write-Host "Are you sure you want to disable $userName"
         $confirmation = Read-Host "Are you sure you want to disable $userName? (y/n)"

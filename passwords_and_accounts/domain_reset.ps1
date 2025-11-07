@@ -39,7 +39,7 @@ Add-Type -AssemblyName System.Web
 Write-Host "Changing domain user passwords..."
 
 # Generate a single strong password
-$newPassword = [System.Web.Security.Membership]::GeneratePassword(12, 3)
+$newPassword = [System.Web.Security.Membership]::GeneratePassword(8, 3)
 $passwords += "Password for all domain users: $newPassword"
 
 foreach ($user in $domainUsers) {
