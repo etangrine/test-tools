@@ -1,6 +1,6 @@
 # Panic-Firewall.ps1
-# BLOCKS ALL TRAFFIC except Scoring, White Team, and specific Services.
-
+# BLOCKS ALL TRAFFIC except Scoring, White Team, and specific Services. Not sure if I will know the scoring ips
+# should allow ports for other services like smb, winrm, and whatever is in the packet when I get it. 
 # --- CONFIGURATION (UPDATE THESE FROM PACKET) ---
 $WhiteTeamIPs = @("10.10.10.10")     # Example: Monitoring boxes
 $ScoringEngine = @("172.16.1.50")    # Example: Scorify IP
@@ -16,9 +16,9 @@ Write-Host "Applying PANIC Firewall Rules..." -ForegroundColor Red
 
 # 1. Reset Firewall
 NetSh Advfirewall set allprofiles state on
-NetSh Advfirewall set allprofiles firewallpolicy blockinbound,allowoutbound
+NetSh Advfirewall set allprofiles firewallpolicy blockinbound,blockoutbound
 
-# 2. Allow Critical Management (RDP from Team Only)
+# 2. Allow Critical Management (RDP from Team Only) TBH rdp should be disabled if its possible to detect if thisn't is a windows clould box
 New-NetFirewallRule -Name "Allow-Team-RDP" -DisplayName "Allow Team RDP" -Direction Inbound -Protocol TCP -LocalPort 3389 -RemoteAddress $TeamSubnet -Action Allow
 
 # 3. Allow Scoring Engine (ALL PORTS from Scoring IP)
