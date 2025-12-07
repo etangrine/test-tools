@@ -16,7 +16,7 @@ Write-Host "Applying PANIC Firewall Rules..." -ForegroundColor Red
 
 # 1. Reset Firewall
 NetSh Advfirewall set allprofiles state on
-NetSh Advfirewall set allprofiles firewallpolicy blockinbound,blockoutbound
+NetSh Advfirewall set allprofiles firewallpolicy blockinbound,allowoutbound
 
 # 2. Allow Critical Management (RDP from Team Only) TBH rdp should be disabled if its possible to detect if thisn't is a windows clould box
 New-NetFirewallRule -Name "Allow-Team-RDP" -DisplayName "Allow Team RDP" -Direction Inbound -Protocol TCP -LocalPort 3389 -RemoteAddress $TeamSubnet -Action Allow
