@@ -49,7 +49,7 @@ if (Get-Service "MSSQLSERVER" -ErrorAction SilentlyContinue) {
 
 # F. Default Block (The "Lockdown")
 # ONLY enable this if you are sure your allow rules are correct!
-# Set-NetFirewallProfile -Profile Domain,Public,Private -DefaultInboundAction Block
+# Set-NetFirewallProfile -Profile Domain,Public,Private -DefaultOutboundAction Block
 
 Stop-Transcript
 # --- END OF LOCAL SCRIPT ---
