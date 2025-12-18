@@ -36,6 +36,7 @@ try {
     
     # Example: Link to Domain Root (Commented out to prevent accidental global scope)
     # New-GPLink -Name $Name -Target "dc=contoso,dc=com"
+    # check how to link to a specific OU
     
 }
 catch {
