@@ -6,16 +6,35 @@ param(
     [string[]]$extraExcludedUsers = @()
 )
 
-# --- Context Detection ---
-try {
-    $ComputerInfo = Get-WmiObject Win32_ComputerSystem -ErrorAction Stop
-    # DomainRole 4 or 5 means it is a Domain Controller
-    $IsDC = $ComputerInfo.DomainRole -ge 4
-    Write-Host "Context Detected: $(if ($IsDC) {'Domain Controller'} else {'Workstation/Server'})" -ForegroundColor Cyan
-} catch {
-    Write-Error "Could not determine computer role. Exiting."
-    exit 1
+# --- Context Detection (Robust) ---
+function Test-IsDomainController {
+    # Primary check: CIM (modern, preferred for PowerShell 3.0+)
+    try {
+        $ComputerInfo = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
+        return $ComputerInfo.DomainRole -ge 4
+    }
+    catch {
+        # Fallback: WMI (legacy, widely available)
+        try {
+            $ComputerInfo = Get-WmiObject Win32_ComputerSystem -ErrorAction Stop
+            return $ComputerInfo.DomainRole -ge 4
+        }
+        catch {
+            # Final fallback: Check for NTDS service (only exists on DCs)
+            try {
+                $ntds = Get-Service -Name 'NTDS' -ErrorAction Stop
+                return $ntds.Status -eq 'Running'
+            }
+            catch {
+                # NTDS service doesn't exist = not a DC
+                return $false
+            }
+        }
+    }
 }
+
+$IsDC = Test-IsDomainController
+Write-Host "Context Detected: $(if ($IsDC) {'Domain Controller'} else {'Workstation/Server'})" -ForegroundColor Cyan
 
 
 # --- Management Logic ---
@@ -59,7 +78,8 @@ if ($IsDC) {
         try {
             New-ADGroup -Name $groupName -GroupScope Global -PassThru
             Write-Host "Created group $groupName."
-        } catch {
+        }
+        catch {
             Write-Error "Failed to create AD group '$groupName'. Check permissions."
             # Continue without group creation
         }
@@ -99,7 +119,8 @@ if ($IsDC) {
                 catch {
                     Write-Warning " - Could not disable $userName. It may be a protected system account."
                 }
-            } else {
+            }
+            else {
                 Write-Host " - Skipped disabling user: $userName" -ForegroundColor Yellow
             }
         }
@@ -107,7 +128,8 @@ if ($IsDC) {
 
     Write-Host "Domain user management complete." -ForegroundColor Green
 
-} else {
+}
+else {
     # This is a Workstation/Server, manage local users.
     Write-Host "Starting Local User Management..." -ForegroundColor Yellow
     
@@ -149,9 +171,10 @@ if ($IsDC) {
         try {
             New-LocalGroup -Name $groupName -ErrorAction Stop
             Write-Host "Created group $groupName."
-        } catch {
-             Write-Error "Failed to create local group '$groupName'. Check permissions."
-             # Continue without group creation
+        }
+        catch {
+            Write-Error "Failed to create local group '$groupName'. Check permissions."
+            # Continue without group creation
         }
     }
 
@@ -189,7 +212,8 @@ if ($IsDC) {
                 catch {
                     Write-Warning " - Could not disable $userName."
                 }
-            } else {
+            }
+            else {
                 Write-Host " - Skipped disabling user: $userName" -ForegroundColor Yellow
             }
         }

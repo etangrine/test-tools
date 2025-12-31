@@ -5,11 +5,34 @@
 # --- Configuration ---
 $AuthorizedUsers = @("Administrator", "Guest", "krbtgt", "DefaultAccount") # Add your team users here
 
-# --- Context Detection ---
-$ComputerInfo = Get-WmiObject Win32_ComputerSystem
-# DomainRole 4 or 5 means it is a Domain Controller
-$IsDC = $ComputerInfo.DomainRole -ge 4
+# --- Context Detection (Robust) ---
+function Test-IsDomainController {
+    # Primary check: CIM (modern, preferred for PowerShell 3.0+)
+    try {
+        $ComputerInfo = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
+        return $ComputerInfo.DomainRole -ge 4
+    }
+    catch {
+        # Fallback: WMI (legacy, widely available)
+        try {
+            $ComputerInfo = Get-WmiObject Win32_ComputerSystem -ErrorAction Stop
+            return $ComputerInfo.DomainRole -ge 4
+        }
+        catch {
+            # Final fallback: Check for NTDS service (only exists on DCs)
+            try {
+                $ntds = Get-Service -Name 'NTDS' -ErrorAction Stop
+                return $ntds.Status -eq 'Running'
+            }
+            catch {
+                # NTDS service doesn't exist = not a DC
+                return $false
+            }
+        }
+    }
+}
 
+$IsDC = Test-IsDomainController
 Write-Host "Context Detected: $(if ($IsDC) {'Domain Controller'} else {'Workstation/Server'})" -ForegroundColor Cyan
 
 # --- Audit Logic ---
@@ -26,11 +49,13 @@ if ($IsDC) {
                     Write-Host "[ALERT] Unknown Admin in $($Group): $($Member.Name) ($($Member.SamAccountName))" -ForegroundColor Red
                 }
             }
-        } catch {
+        }
+        catch {
             Write-Warning "Could not query group $Group"
         }
     }
-} else {
+}
+else {
     Write-Host "Scanning Local Users..." -ForegroundColor Yellow
     $LocalUsers = Get-LocalUser
     foreach ($User in $LocalUsers) {
