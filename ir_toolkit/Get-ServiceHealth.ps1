@@ -44,6 +44,7 @@ function Test-ServiceDeepHealth {
         StartType     = "Unknown"
         RegistryACL   = "Unknown" # Safe/Unsafe/Error
         RegistryStart = "Unknown" # Correct/Mismatch/Error
+        LogOnAs       = "Unknown" # Service Account (LocalSystem etc)
         SDDL          = "Unknown" # Safe/Restricted/Error
         ImagePath     = "Unknown" # Valid/Missing/Error
         Dependencies  = "Unknown" # OK/Broken
@@ -84,14 +85,57 @@ function Test-ServiceDeepHealth {
         }
         catch { $Result.RegistryStart = "Error" }
 
-        # 3. Check Image Path
+        # 3. Check Service User (LogOnAs)
+        try {
+            $ObjName = Get-ItemProperty -Path $RegPath -Name "ObjectName" -ErrorAction SilentlyContinue
+            if ($ObjName) {
+                $Result.LogOnAs = $ObjName.ObjectName
+            }
+        }
+        catch { $Result.LogOnAs = "Error" }
+
+        # 4. Check Image Path and Digital Signature
         try {
             $ImgProp = Get-ItemProperty -Path $RegPath -Name "ImagePath" -ErrorAction SilentlyContinue
             if ($ImgProp) {
                 $ExpandedPath = [System.Environment]::ExpandEnvironmentVariables($ImgProp.ImagePath)
                 # Remove quotes and arguments for basic file check
                 $ExePath = ($ExpandedPath -split ' ')[0] -replace '"', ''
-                if (Test-Path $ExePath) { $Result.ImagePath = "Valid" }
+                if (Test-Path $ExePath) { 
+                    # File exists, now check digital signature
+                    $Sig = Get-AuthenticodeSignature -FilePath $ExePath -ErrorAction SilentlyContinue
+                    if ($Sig) {
+                        switch ($Sig.Status) {
+                            "Valid" {
+                                # Check if signed by Microsoft
+                                $SignerCert = $Sig.SignerCertificate
+                                if ($SignerCert -and $SignerCert.Subject -match "O=Microsoft Corporation") {
+                                    $Result.ImagePath = "Valid(MS Signed)"
+                                }
+                                else {
+                                    # Valid signature but not Microsoft - could be legitimate third-party or suspicious
+                                    $SignerName = if ($SignerCert) { ($SignerCert.Subject -split ',')[0] -replace 'CN=', '' } else { "Unknown" }
+                                    $Result.ImagePath = "VALID(3rdParty:$SignerName)"
+                                }
+                            }
+                            "NotSigned" {
+                                $Result.ImagePath = "WARNING:NotSigned"
+                            }
+                            "HashMismatch" {
+                                $Result.ImagePath = "CRITICAL:Tampered"
+                            }
+                            "NotTrusted" {
+                                $Result.ImagePath = "WARNING:NotTrusted"
+                            }
+                            default {
+                                $Result.ImagePath = "WARNING:$($Sig.Status)"
+                            }
+                        }
+                    }
+                    else {
+                        $Result.ImagePath = "Valid(SigCheckFailed)"
+                    }
+                }
                 else { $Result.ImagePath = "FILE MISSING" }
             }
         }
@@ -102,7 +146,7 @@ function Test-ServiceDeepHealth {
         $Result.RegistryStart = "RegKeyMissing"
     }
 
-    # 4. Check SDDL (Service Permissions)
+    # 5. Check SDDL (Service Permissions)
     try {
         $SDDL = sc.exe sdshow $ServiceName | Out-String
         if ($SDDL -match "BA") { $Result.SDDL = "Safe" }
@@ -112,7 +156,7 @@ function Test-ServiceDeepHealth {
     }
     catch { $Result.SDDL = "Error" }
 
-    # 5. Check Dependencies
+    # 6. Check Dependencies
     if ($ServiceObj) {
         $DepStatus = @()
         foreach ($Dep in $ServiceObj.RequiredServices) {
@@ -122,7 +166,7 @@ function Test-ServiceDeepHealth {
         else { $Result.Dependencies = "OK" }
     }
 
-    # 6. IIS Specific Checks
+    # 7. IIS Specific Checks
     if ($ServiceName -eq "W3SVC") {
         $wwwHealth = @()
         $WebRoot = "C:\inetpub\wwwroot"
