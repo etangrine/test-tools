@@ -24,7 +24,10 @@ Write-Host "Gathering System Inventory..." -ForegroundColor Cyan
 $Inventory["OS"] = Get-ComputerInfo | Select-Object OsName, OsVersion, CsName, OsUptime
 
 # 2. Network Config
-$Inventory["Network"] = Get-NetIPConfiguration | Select-Object InterfaceAlias, IPv4Address, IPv4DefaultGateway, DNSServer
+$Inventory["Network"] = Get-NetIPConfiguration | Select-Object InterfaceAlias,
+@{N = "IPv4Address"; E = { ($_.IPv4Address.IPAddress) -join ", " } },
+@{N = "IPv4DefaultGateway"; E = { ($_.IPv4DefaultGateway.NextHop) -join ", " } },
+@{N = "DNSServer"; E = { ($_.DNSServer.ServerAddresses) -join ", " } }
 
 # 3. Local Users (Admins)
 $Admins = Get-LocalGroupMember -Group "Administrators" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
