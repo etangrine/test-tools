@@ -188,47 +188,63 @@ function Test-ServiceBaseline {
     # 4. Check Ports (only if service is running)
     if ($ServiceObj.Status -eq 'Running' -and $Baseline.ExpectedPorts -and $Baseline.ExpectedPorts.Count -gt 0) {
         try {
-            $ProcessId = Get-ServiceProcessId -ServiceName $ServiceName
+            $Protocol = if ($Baseline.PortCheckProtocol -eq 'UDP') { 'UDP' } else { 'TCP' }
+            $CheckByPID = if ($null -eq $Baseline.PortCheckByPID) { $true } else { $Baseline.PortCheckByPID }
             
-            if ($ProcessId -and $ProcessId -gt 0) {
-                $Protocol = if ($Baseline.PortCheckProtocol -eq 'UDP') { 'UDP' } else { 'TCP' }
+            $ListeningPorts = @()
+            
+            if ($CheckByPID) {
+                # Strict check: verify port is owned by service's process
+                $ProcessId = Get-ServiceProcessId -ServiceName $ServiceName
                 
-                # Get listening ports for this process
-                if ($Protocol -eq 'TCP') {
-                    $ListeningPorts = Get-NetTCPConnection -State Listen -OwningProcess $ProcessId -ErrorAction SilentlyContinue |
-                    Select-Object -ExpandProperty LocalPort -Unique
-                }
-                else {
-                    # UDP doesn't have "Listen" state, just check endpoints
-                    $ListeningPorts = Get-NetUDPEndpoint -OwningProcess $ProcessId -ErrorAction SilentlyContinue |
-                    Select-Object -ExpandProperty LocalPort -Unique
-                }
-                
-                if (-not $ListeningPorts) {
-                    $ListeningPorts = @()
-                }
-                
-                $MissingPorts = @()
-                foreach ($ExpPort in $Baseline.ExpectedPorts) {
-                    if ($ExpPort -notin $ListeningPorts) {
-                        $MissingPorts += $ExpPort
+                if ($ProcessId -and $ProcessId -gt 0) {
+                    if ($Protocol -eq 'TCP') {
+                        $ListeningPorts = Get-NetTCPConnection -State Listen -OwningProcess $ProcessId -ErrorAction SilentlyContinue |
+                        Select-Object -ExpandProperty LocalPort -Unique
+                    }
+                    else {
+                        $ListeningPorts = Get-NetUDPEndpoint -OwningProcess $ProcessId -ErrorAction SilentlyContinue |
+                        Select-Object -ExpandProperty LocalPort -Unique
                     }
                 }
-                
-                if ($MissingPorts.Count -eq 0) {
-                    $Result.PortStatus = "OK"
-                }
                 else {
-                    $Result.PortStatus = "NOT_LISTENING"
-                    $Result.Issues += "Expected ports not listening: $($MissingPorts -join ', ')"
-                    if ($ListeningPorts.Count -gt 0) {
-                        $Result.Issues += "Currently listening on: $($ListeningPorts -join ', ')"
-                    }
+                    $Result.PortStatus = "NO_PID"
+                    $Result.Issues += "Could not determine service process ID"
+                    return $Result
                 }
             }
             else {
-                $Result.PortStatus = "NO_PID"
-                $Result.Issues += "Could not determine service process ID"
+                # Relaxed check: just verify the port is listening on the system (for shared svchost/HTTP.sys services)
+                foreach ($ExpPort in $Baseline.ExpectedPorts) {
+                    if ($Protocol -eq 'TCP') {
+                        $PortOpen = Get-NetTCPConnection -LocalPort $ExpPort -State Listen -ErrorAction SilentlyContinue
+                    }
+                    else {
+                        $PortOpen = Get-NetUDPEndpoint -LocalPort $ExpPort -ErrorAction SilentlyContinue
+                    }
+                    if ($PortOpen) {
+                        $ListeningPorts += $ExpPort
+                    }
+                }
+            }
+            
+            if (-not $ListeningPorts) {
+                $ListeningPorts = @()
+            }
+            
+            $MissingPorts = @()
+            foreach ($ExpPort in $Baseline.ExpectedPorts) {
+                if ($ExpPort -notin $ListeningPorts) {
+                    $MissingPorts += $ExpPort
+                }
+            }
+            
+            if ($MissingPorts.Count -eq 0) {
+                $Result.PortStatus = "OK"
+            }
+            else {
+                $Result.PortStatus = "NOT_LISTENING"
+                $Result.Issues += "Expected ports not listening: $($MissingPorts -join ', ')"
             }
         }
         catch {
