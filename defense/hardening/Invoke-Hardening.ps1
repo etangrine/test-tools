@@ -62,7 +62,7 @@ if (-not $SkipLogging) {
     $modLogKey = "$psLogKey\ModuleLogging"
     if (-not (Test-Path $modLogKey)) { New-Item -Path $modLogKey -Force | Out-Null }
     Set-ItemProperty -Path $modLogKey -Name "EnableModuleLogging" -Value 1
-    Set-ItemProperty -Path $modLogKey -Name "ModuleNames" -Value "*"
+    Set-ItemProperty -Path $modLogKey -Name "ModuleNames" -Value @("*") -Type MultiString
     Write-Host "  [+] Enabled PowerShell Module Logging (all modules)" -ForegroundColor Green
     
     # --- Process Creation Auditing (Event ID 4688) ---
