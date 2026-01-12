@@ -5,13 +5,13 @@
 # The source folder to back up.
 param(
     [string]$sourceDir = "C:\inetpub\wwwroot",
-    [string]$backupDir = "C:\Random\Extra"
+    [string]$backupDir = "$env:USERPROFILE\Desktop\Backups"
 )
 
 # --- SCRIPT BODY ---
 # Create the backup destination directory if it doesn't exist.
-if (-not (Test-Path $backupDir)){
-    New-Item -ItemType Directory -Path $backupDir-Null
+if (-not (Test-Path $backupDir)) {
+    New-Item -ItemType Directory -Path $backupDir | Out-Null
 }
 
 # Create a timestamp for a unique backup file name.

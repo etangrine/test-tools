@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"path": "../../../../ritsec/IRSEC/ccdc-main"
+		},
+		{
+			"path": "../../../ir_tools"
+		}
+	],
+	"settings": {}
+}

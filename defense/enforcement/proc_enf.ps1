@@ -31,8 +31,9 @@ foreach ($p in $procs) {
             Write-Host "   Status: $($sig.Status)"
             
             # Auto-kill if KillMode is on OR if it's a critical binary impersonator
-            # Check for critical binary impersonation
-            $IsTargetBinary = ("svchost", "lsass" -contains $p.ProcessName)
+            # Check for critical binary impersonation (processes that should only run from System32)
+            $CriticalBinaries = @("svchost", "lsass", "csrss", "services", "winlogon", "smss", "wininit", "spoolsv")
+            $IsTargetBinary = ($CriticalBinaries -contains $p.ProcessName)
 
             if ($KillMode) {
                 Write-Host "   [!] KILLING PROCESS..." -BackgroundColor Red -ForegroundColor White

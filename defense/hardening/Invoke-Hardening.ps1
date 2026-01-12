@@ -40,9 +40,27 @@ param(
 
 $ErrorActionPreference = "Continue"
 
+# --- DataDog Protection (ISTS Quals Rules - Out of Scope) ---
+# These paths and processes must not be modified per competition rules
+$DataDogPaths = @(
+    "C:\ProgramData\Datadog",
+    "C:\Program Files\Datadog",
+    "/etc/datadog-agent"  # Linux path for reference
+)
+$DataDogUsers = @("datadog", "dd-dog", "dd-agent")
+
+function Test-IsDataDogPath {
+    param([string]$Path)
+    foreach ($ddPath in $DataDogPaths) {
+        if ($Path -like "$ddPath*") { return $true }
+    }
+    return $false
+}
+
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "  WINDOWS HARDENING SCRIPT" -ForegroundColor Cyan
 Write-Host "========================================`n" -ForegroundColor Cyan
+Write-Host "[INFO] DataDog paths and users are protected (out-of-scope)" -ForegroundColor DarkGray
 
 #region ==================== LOGGING ====================
 if (-not $SkipLogging) {

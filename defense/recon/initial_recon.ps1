@@ -37,7 +37,7 @@ Write-Log "`n[+] Autorun Programs (from Registry):"
 # Checks registry keys where malware often places persistence
 Write-Log (Get-Item "HKLM:\Software\Microsoft\Windows\CurrentVersion\Run" | Get-ItemProperty | Select-Object * | Format-List | Out-String)
 Write-Log (Get-Item "HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce" | Get-ItemProperty | Select-Object * | Format-List | Out-String)
-Write-Log (Get-Item "HKCU\Software\Microsoft\Command Processor\AutoRun" | Get-ItemProperty | Select-Object * | Format-List | Out-String)
+Write-Log (Get-ItemProperty -Path "HKCU:\Software\Microsoft\Command Processor" -Name "AutoRun" -ErrorAction SilentlyContinue | Select-Object AutoRun | Format-List | Out-String)
 
 
 Write-Log "`n[+] Installed Services:"

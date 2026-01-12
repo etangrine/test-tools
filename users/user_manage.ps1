@@ -106,9 +106,7 @@ if ($IsDC) {
             $userName -notin $allowedDomainUsers -and
             $normalizedUserName -notmatch '(?i)datadog' -and
             $normalizedUserName -notmatch '(?i)dddog' -and
-            $normalizedUserName -notmatch '(?i)whiteteam' -and
-            $normalizedUserName -notmatch '(?i)blackteam' -and
-            $normalizedUserName -notmatch '(?i)grayteam'
+            $normalizedUserName -notmatch '(?i)whiteteam'
         ) {
             $confirmation = Read-Host "Are you sure you want to disable domain user '$userName'? (y/n)"
             if ($confirmation -eq 'y') {
@@ -150,10 +148,11 @@ else {
         "Guest",
         "DefaultAccount",
         "WDAGUtilityAccount",
-        # Datadog users mentioned in rules [cite: 87]
+        # Datadog users mentioned in rules (page 9 of packet)
         "datadog",
         "dd-dog",
         "dd-agent",
+        # White Team user is out-of-scope (page 9 of packet)
         "whiteteam"
     )
 
@@ -199,9 +198,7 @@ else {
             $userName -notin $allowedLocalUsers -and
             $normalizedUserName -notmatch '(?i)datadog' -and
             $normalizedUserName -notmatch '(?i)dddog' -and
-            $normalizedUserName -notmatch '(?i)whiteteam' -and
-            $normalizedUserName -notmatch '(?i)blackteam' -and
-            $normalizedUserName -notmatch '(?i)grayteam'
+            $normalizedUserName -notmatch '(?i)whiteteam'
         ) {
             $confirmation = Read-Host "Are you sure you want to disable local user '$userName'? (y/n)"
             if ($confirmation -eq 'y') {
