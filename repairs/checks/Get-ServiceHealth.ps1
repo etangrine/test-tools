@@ -277,10 +277,10 @@ function Test-ServiceDeepHealth {
                 if ([string]::IsNullOrWhiteSpace($DepName)) { continue }
                 $DepSvc = Get-Service -Name $DepName -ErrorAction SilentlyContinue
                 if (-not $DepSvc) {
-                    $DepStatus += "$DepName:NOT_INSTALLED"
+                    $DepStatus += "$($DepName):NOT_INSTALLED"
                 }
                 elseif ($DepSvc.Status -ne "Running") {
-                    $DepStatus += "$DepName:$($DepSvc.Status)"
+                    $DepStatus += "$($DepName):$($DepSvc.Status)"
                 }
             }
         }
