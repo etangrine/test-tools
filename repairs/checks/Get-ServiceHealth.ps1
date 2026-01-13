@@ -345,6 +345,29 @@ function Test-ServiceDeepHealth {
                 $Result.Issues += "LogOnAs mismatch: expected $($Baseline.ExpectedLogOnAs)"
             }
         }
+
+        # Dependency Match - check if expected dependencies are still configured
+        if ($Baseline.ExpectedDependencies -and $Baseline.ExpectedDependencies.Count -gt 0) {
+            $CurrentDeps = @()
+            if ($ServiceObj.RequiredServices) {
+                $CurrentDeps = $ServiceObj.RequiredServices | ForEach-Object { $_.Name }
+            }
+            
+            $MissingDeps = @()
+            foreach ($ExpDep in $Baseline.ExpectedDependencies) {
+                if ($ExpDep -notin $CurrentDeps) {
+                    $MissingDeps += $ExpDep
+                }
+            }
+            
+            if ($MissingDeps.Count -eq 0) { 
+                $Result.DependencyMatch = "OK" 
+            }
+            else { 
+                $Result.DependencyMatch = "MISSING"
+                $Result.Issues += "Dependencies removed: $($MissingDeps -join ', ')"
+            }
+        }
     }
 
     # === SERVICE-SPECIFIC CHECKS ===
