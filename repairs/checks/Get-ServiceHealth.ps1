@@ -266,10 +266,30 @@ function Test-ServiceDeepHealth {
     }
     catch { $Result.SDDL = "Error" }
 
-    # 6. Check Dependencies
+    # 6. Check Dependencies (deep health - are current deps running?)
     $DepStatus = @()
-    foreach ($Dep in $ServiceObj.RequiredServices) {
-        if ($Dep.Status -ne "Running") { $DepStatus += "$($Dep.Name):$($Dep.Status)" }
+    # Get dependencies from registry (more reliable than RequiredServices for broken deps)
+    try {
+        $DepRegValue = Get-ItemProperty -Path $RegPath -Name "DependOnService" -ErrorAction SilentlyContinue
+        if ($DepRegValue -and $DepRegValue.DependOnService) {
+            $ConfiguredDeps = $DepRegValue.DependOnService
+            foreach ($DepName in $ConfiguredDeps) {
+                if ([string]::IsNullOrWhiteSpace($DepName)) { continue }
+                $DepSvc = Get-Service -Name $DepName -ErrorAction SilentlyContinue
+                if (-not $DepSvc) {
+                    $DepStatus += "$DepName:NOT_INSTALLED"
+                }
+                elseif ($DepSvc.Status -ne "Running") {
+                    $DepStatus += "$DepName:$($DepSvc.Status)"
+                }
+            }
+        }
+    }
+    catch {
+        # Fallback to RequiredServices
+        foreach ($Dep in $ServiceObj.RequiredServices) {
+            if ($Dep.Status -ne "Running") { $DepStatus += "$($Dep.Name):$($Dep.Status)" }
+        }
     }
     if ($DepStatus.Count -gt 0) { 
         $Result.Dependencies = "Issues"
@@ -346,13 +366,24 @@ function Test-ServiceDeepHealth {
             }
         }
 
-        # Dependency Match - check if expected dependencies are still configured
+        # Dependency Match - check if expected dependencies are still configured AND no extras added
         if ($Baseline.ExpectedDependencies -and $Baseline.ExpectedDependencies.Count -gt 0) {
+            # Get current deps from registry (more reliable for detecting all deps)
             $CurrentDeps = @()
-            if ($ServiceObj.RequiredServices) {
-                $CurrentDeps = $ServiceObj.RequiredServices | ForEach-Object { $_.Name }
+            try {
+                $DepRegValue = Get-ItemProperty -Path $RegPath -Name "DependOnService" -ErrorAction SilentlyContinue
+                if ($DepRegValue -and $DepRegValue.DependOnService) {
+                    $CurrentDeps = $DepRegValue.DependOnService | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+                }
+            }
+            catch {
+                # Fallback to RequiredServices
+                if ($ServiceObj.RequiredServices) {
+                    $CurrentDeps = $ServiceObj.RequiredServices | ForEach-Object { $_.Name }
+                }
             }
             
+            # Check for MISSING expected deps
             $MissingDeps = @()
             foreach ($ExpDep in $Baseline.ExpectedDependencies) {
                 if ($ExpDep -notin $CurrentDeps) {
@@ -360,12 +391,29 @@ function Test-ServiceDeepHealth {
                 }
             }
             
-            if ($MissingDeps.Count -eq 0) { 
+            # Check for EXTRA injected deps (not in baseline)
+            $ExtraDeps = @()
+            foreach ($CurrDep in $CurrentDeps) {
+                if ($CurrDep -notin $Baseline.ExpectedDependencies) {
+                    $ExtraDeps += $CurrDep
+                }
+            }
+            
+            # Determine overall status
+            if ($MissingDeps.Count -eq 0 -and $ExtraDeps.Count -eq 0) { 
                 $Result.DependencyMatch = "OK" 
             }
-            else { 
+            elseif ($MissingDeps.Count -gt 0 -and $ExtraDeps.Count -gt 0) {
+                $Result.DependencyMatch = "TAMPERED"
+                $Result.Issues += "Dependencies tampered: missing=[$($MissingDeps -join ',')] extra=[$($ExtraDeps -join ',')]"
+            }
+            elseif ($MissingDeps.Count -gt 0) { 
                 $Result.DependencyMatch = "MISSING"
                 $Result.Issues += "Dependencies removed: $($MissingDeps -join ', ')"
+            }
+            else { 
+                $Result.DependencyMatch = "EXTRA"
+                $Result.Issues += "Dependencies injected: $($ExtraDeps -join ', ')"
             }
         }
     }
