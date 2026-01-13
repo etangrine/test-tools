@@ -44,15 +44,16 @@
     }
 
     # Windows Remote Management (WinRM)
+    # NOTE: Port 5986 (HTTPS) only available if SSL cert + HTTPS listener configured
     WinRM        = @{
         DisplayName          = "Windows Remote Management (WS-Management)"
-        ExpectedPorts        = @(5985, 5986)
-        ExpectedImagePath    = '%SystemRoot%\System32\svchost.exe -k NetworkService'
-        ExpectedLogOnAs      = 'NT AUTHORITY\NETWORK SERVICE'
+        ExpectedPorts        = @(5985)  # Only HTTP by default; add 5986 if HTTPS configured
+        ExpectedImagePath    = '%SystemRoot%\System32\svchost.exe -k NetworkService -p'
+        ExpectedLogOnAs      = 'NT AUTHORITY\NetworkService'
         ExpectedDependencies = @('HTTP', 'RPCSS')
         PortCheckProtocol    = 'TCP'
-        PortCheckByPID       = $false  # WinRM uses HTTP.sys
-        Notes                = "5985=HTTP, 5986=HTTPS - uses HTTP.sys not direct socket"
+        PortCheckByPID       = $false  # WinRM uses HTTP.sys, not direct PID binding
+        Notes                = "5985=HTTP (default), 5986=HTTPS (requires cert+listener)"
     }
 
     # Active Directory Domain Services (NTDS)
