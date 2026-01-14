@@ -4,7 +4,7 @@
 
 param(
     [string[]]$extraUsers = @(),
-    [switch]$SaveToFile
+    [switch]$NoSave
 )
 
 # --- Context Detection (Robust) ---
@@ -113,8 +113,8 @@ if ($IsDC) {
         }
     }
 
-    # Save passwords to file if requested
-    if ($SaveToFile) {
+    # Save passwords to file by default
+    if (-not $NoSave) {
         $passwords | Out-File -FilePath $outFile
         Write-Host "Password reset complete. Credentials saved to $outFile" -ForegroundColor Cyan
     }
@@ -172,8 +172,8 @@ else {
         }
     }
 
-    # Save passwords to file if requested
-    if ($SaveToFile) {
+    # Save passwords to file by default
+    if (-not $NoSave) {
         $passwords | Out-File -FilePath $outFile
         Write-Host "Password reset complete. Credentials saved to $outFile" -ForegroundColor Cyan
     }
