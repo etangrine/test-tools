@@ -182,7 +182,35 @@ else {
 }
 
 Write-Host "[*] Loading baseline: $targetBaseline" -ForegroundColor Yellow
-$baseline = Get-Content $targetBaseline -Raw | ConvertFrom-Json
+
+# Validate it's a JSON file
+if (-not $targetBaseline.EndsWith('.json')) {
+    Write-Error "Baseline file must be a .json file created by New-ServiceFingerprint.ps1"
+    Write-Host ""
+    Write-Host "Usage:" -ForegroundColor Yellow
+    Write-Host "  1. First create a baseline:  .\New-ServiceFingerprint.ps1 -Service IIS" -ForegroundColor Cyan
+    Write-Host "  2. Then compare against it:  .\Compare-ServiceFingerprint.ps1 -Service IIS" -ForegroundColor Cyan
+    exit 1
+}
+
+try {
+    $baseline = Get-Content $targetBaseline -Raw | ConvertFrom-Json
+}
+catch {
+    Write-Error "Failed to parse baseline file as JSON: $_"
+    Write-Host ""
+    Write-Host "The baseline file must be a valid JSON file created by New-ServiceFingerprint.ps1" -ForegroundColor Yellow
+    exit 1
+}
+
+# Validate baseline has required fields
+if (-not $baseline.SourcePath -or -not $baseline.Files) {
+    Write-Error "Invalid baseline file - missing required fields (SourcePath, Files)"
+    Write-Host ""
+    Write-Host "The file does not appear to be a valid fingerprint baseline." -ForegroundColor Yellow
+    Write-Host "Run New-ServiceFingerprint.ps1 to create a proper baseline first." -ForegroundColor Yellow
+    exit 1
+}
 
 Write-Host "    Service: $($baseline.Service)" -ForegroundColor White
 Write-Host "    Source: $($baseline.SourcePath)" -ForegroundColor White

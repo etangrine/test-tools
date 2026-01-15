@@ -5,15 +5,15 @@
 # Define optional parameters for the backup and restore directories.
 #try to only use restoreDir
 param(
-    [string]$backupDir = "C:\Random\Extra",
+    [string]$backupDir = "$env:USERPROFILE\Desktop\Backups",
     [string]$restoreDir = "C:\inetpub\wwwroot"
 )
 
 # --- SCRIPT BODY ---
 # Find the latest backup file automatically.
 $latestBackup = Get-ChildItem -Path $backupDir -Filter "*-backup-*.zip" |
-                Sort-Object Name -Descending |
-                Select-Object -First 1
+Sort-Object Name -Descending |
+Select-Object -First 1
 
 if (-not $latestBackup) {
     Write-Error "No backup files matching '*-backup-*.zip' found in '$backupDir'. Cannot proceed with restore."
