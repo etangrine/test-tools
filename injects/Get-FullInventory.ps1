@@ -3,12 +3,12 @@
     Gathers comprehensive system inventory for Incident Response.
 .DESCRIPTION
     Collects information about OS, Network, Users, Installed Software, and Listening Ports.
-    Exports to a consolidated object or text file.
+    Outputs a formatted report or saves to file.
 .PARAMETER OutputFile
     Optional path to save the inventory report.
 .EXAMPLE
     .\Get-FullInventory.ps1
-    returns an object
+    Displays formatted inventory report
 .EXAMPLE
     .\Get-FullInventory.ps1 -OutputFile "C:\Users\Public\Inventory.txt"
 #>
@@ -18,19 +18,16 @@ param(
 
 # --- Context Detection (Robust) ---
 function Test-IsDomainController {
-    # Primary check: CIM (modern, preferred for PowerShell 3.0+)
     try {
         $ComputerInfo = Get-CimInstance Win32_ComputerSystem -ErrorAction Stop
         return $ComputerInfo.DomainRole -ge 4
     }
     catch {
-        # Fallback: WMI (legacy, widely available)
         try {
             $ComputerInfo = Get-WmiObject Win32_ComputerSystem -ErrorAction Stop
             return $ComputerInfo.DomainRole -ge 4
         }
         catch {
-            # Final fallback: Check for NTDS service (only exists on DCs)
             try {
                 $ntds = Get-Service -Name 'NTDS' -ErrorAction Stop
                 return $ntds.Status -eq 'Running'
@@ -43,56 +40,85 @@ function Test-IsDomainController {
 }
 
 $IsDC = Test-IsDomainController
-$Inventory = [ordered]@{}
+$Output = [System.Text.StringBuilder]::new()
+
+# --- Helper to build output ---
+function Add-Section {
+    param([string]$Title, [string]$Content)
+    [void]$Output.AppendLine("")
+    [void]$Output.AppendLine("=" * 60)
+    [void]$Output.AppendLine("  $Title")
+    [void]$Output.AppendLine("=" * 60)
+    [void]$Output.AppendLine($Content)
+}
 
 Write-Host "Gathering System Inventory..." -ForegroundColor Cyan
-Write-Host "Context: $(if ($IsDC) {'Domain Controller'} else {'Workstation/Server'})" -ForegroundColor Cyan
 
-# 1. OS Info
-$Inventory["OS"] = Get-ComputerInfo | Select-Object OsName, OsVersion, CsName, OsUptime
+# 1. Host & OS Info
+$OSInfo = Get-ComputerInfo | Select-Object CsName, OsName, OsVersion, OsUptime
+$Hostname = $OSInfo.CsName
+$SystemType = if ($IsDC) { "Domain Controller" } else { "Workstation/Server" }
+
+$HostSection = @"
+Hostname:    $Hostname
+System Type: $SystemType
+OS Name:     $($OSInfo.OsName)
+OS Version:  $($OSInfo.OsVersion)
+Uptime:      $($OSInfo.OsUptime)
+"@
+Add-Section "HOST INFORMATION" $HostSection
 
 # 2. Network Config
-$Inventory["Network"] = Get-NetIPConfiguration | Select-Object InterfaceAlias,
-@{N = "IPv4Address"; E = { ($_.IPv4Address.IPAddress) -join ", " } },
-@{N = "IPv4DefaultGateway"; E = { ($_.IPv4DefaultGateway.NextHop) -join ", " } },
-@{N = "DNSServer"; E = { ($_.DNSServer.ServerAddresses) -join ", " } }
+$NetConfig = Get-NetIPConfiguration | ForEach-Object {
+    [PSCustomObject]@{
+        Interface = $_.InterfaceAlias
+        IPv4      = ($_.IPv4Address.IPAddress) -join ", "
+        Gateway   = ($_.IPv4DefaultGateway.NextHop) -join ", "
+        DNS       = ($_.DNSServer.ServerAddresses) -join ", "
+    }
+}
+$NetSection = ($NetConfig | Format-Table -AutoSize | Out-String).Trim()
+Add-Section "NETWORK CONFIGURATION" $NetSection
 
-# 3. Users (Context-Aware)
+# 3. Users (Context-Aware - simplified, no admin group breakdown)
 if ($IsDC) {
-    # Domain Controller: Get domain users and privileged group members
     try {
         Import-Module ActiveDirectory -ErrorAction Stop
-        $Inventory["DomainUsers"] = Get-ADUser -Filter * | Select-Object SamAccountName, Name, Enabled
-        $Inventory["DomainAdmins"] = Get-ADGroupMember -Identity "Domain Admins" -Recursive -ErrorAction SilentlyContinue | Select-Object Name, SamAccountName
-        $Inventory["EnterpriseAdmins"] = Get-ADGroupMember -Identity "Enterprise Admins" -Recursive -ErrorAction SilentlyContinue | Select-Object Name, SamAccountName
-        $Inventory["SchemaAdmins"] = Get-ADGroupMember -Identity "Schema Admins" -Recursive -ErrorAction SilentlyContinue | Select-Object Name, SamAccountName
+        $Users = Get-ADUser -Filter * | Select-Object SamAccountName, Name, Enabled
+        $UserSection = ($Users | Format-Table -AutoSize | Out-String).Trim()
     }
     catch {
-        Write-Warning "Could not query Active Directory: $_"
-        $Inventory["DomainUsers"] = "Error querying AD"
+        $UserSection = "Error querying Active Directory: $_"
     }
 }
 else {
-    # Workstation/Server: Get local admins
-    $Admins = Get-LocalGroupMember -Group "Administrators" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
-    $Inventory["LocalAdmins"] = $Admins
+    $Users = Get-LocalUser | Select-Object Name, Enabled, LastLogon
+    $UserSection = ($Users | Format-Table -AutoSize | Out-String).Trim()
 }
+Add-Section "USERS" $UserSection
 
-# 4. Listening Ports (mapped to processes)
-# Requires high privileges for process mapping
-$Ports = Get-NetTCPConnection -State Listen | Select-Object LocalAddress, LocalPort, @{N = "ProcessName"; E = { (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName } }
-$Inventory["ListeningPorts"] = $Ports
+# 4. All Listening Ports (simplified - just ports)
+$Ports = Get-NetTCPConnection -State Listen | 
+Select-Object LocalAddress, LocalPort |
+Sort-Object LocalPort -Unique
+$PortSection = ($Ports | Format-Table -AutoSize | Out-String).Trim()
+Add-Section "LISTENING PORTS" $PortSection
 
-# 5. Installed Software (Basic Registry Check)
-$Software = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName, DisplayVersion, Publisher
-$Inventory["Software"] = $Software
+# 5. Installed Software (filter out empty entries)
+$Software = Get-ItemProperty HKLM:\Software\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\* -ErrorAction SilentlyContinue | 
+Where-Object { $_.DisplayName } |
+Select-Object DisplayName, DisplayVersion, Publisher |
+Sort-Object DisplayName
+$SoftwareSection = ($Software | Format-Table -AutoSize | Out-String).Trim()
+Add-Section "INSTALLED SOFTWARE" $SoftwareSection
 
-$Results = [PSCustomObject]$Inventory
+# --- Output ---
+$FinalOutput = $Output.ToString()
 
 if ($OutputFile) {
-    $Results | Out-String | Set-Content -Path $OutputFile
+    $FinalOutput | Set-Content -Path $OutputFile
     Write-Host "[+] Inventory saved to $OutputFile" -ForegroundColor Green
 }
 else {
-    return $Results
+    Write-Host $FinalOutput
 }
