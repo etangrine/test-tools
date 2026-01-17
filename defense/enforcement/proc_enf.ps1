@@ -4,8 +4,25 @@ param(
     [switch]$KillMode
 ) 
 
-# specific processes to ignore (e.g., your tools, Python, Wireshark)
-$Whitelist = @("powershell", "pwsh", "ise", "explorer") 
+# specific processes to ignore (ISTS Quals compliant)
+$Whitelist = @(
+    # DataDog (Out of Scope per ISTS rules)
+    "ddagent", "datadog-agent", "trace-agent", "process-agent", "security-agent",
+    # Whiteteam (Out of Scope)
+    "whiteteam",
+    # IIS
+    "w3wp",
+    # DNS
+    "dns",
+    # WinRM
+    "wsmprovhost",
+    # AD Web Services
+    "Microsoft.ActiveDirectory.WebServices",
+    # Wazuh Agent (Windows)
+    "wazuh-agent", "ossec-agent",
+    # Admin Tools
+    "powershell", "pwsh", "powershell_ise", "explorer", "code", "mmc", "taskmgr", "regedit"
+) 
 
 # --- THE SCRIPT ---
 Write-Host "Starting Signature Scan..." -ForegroundColor Cyan
